@@ -17,6 +17,12 @@
         height: 100%;
       }
 
+      @property --foreground-color {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #172b36;
+      }
+
       body {
         height: 100%;
         margin: 0;
@@ -24,7 +30,120 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: linear-gradient(to bottom, #172b36 0%, #d9e8e3 100%);
+        position: relative;
+        overflow: hidden;
+        color: var(--foreground-color);
+        background: #05070f;
+        transition: color 400ms ease;
+      }
+
+      body.sunrise {
+        --foreground-color: #172b36;
+      }
+
+      body.midday {
+        --foreground-color: #1a2f3a;
+      }
+
+      body.sunset {
+        --foreground-color: #142530;
+      }
+
+      body.night {
+        --foreground-color: #d9e8e3;
+      }
+
+      .sky {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(180deg, #92d7f5 0%, #d9f2ff 35%, #f9fbff 100%);
+        pointer-events: none;
+        z-index: 0;
+        transition: background 800ms ease;
+      }
+
+      .sky.sunrise {
+        background: linear-gradient(180deg, #ffb48a 0%, #ffe8a3 45%, #87c6e5 100%);
+      }
+
+      .sky.midday {
+        background: linear-gradient(180deg, #92d7f5 0%, #d9f2ff 35%, #f9fbff 100%);
+      }
+
+      .sky.sunset {
+        background: linear-gradient(180deg, #ff9966 0%, #ffcc66 35%, #514a6d 100%);
+      }
+
+      .sky.night {
+        background: radial-gradient(circle at top, #0b1224 0%, #03050b 55%, #000 100%);
+      }
+
+      .sky::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 60vmin;
+        height: 60vmin;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 219, 137, 0.85) 0%,
+          rgba(255, 219, 137, 0.55) 35%,
+          rgba(255, 219, 137, 0) 70%
+        );
+        transform: translate(-50%, -10%) scale(0.8);
+        mix-blend-mode: screen;
+        filter: blur(2px);
+        opacity: 0.9;
+        transition: opacity 800ms ease, transform 800ms ease;
+      }
+
+      .sky.sunrise::before {
+        transform: translate(-50%, 10%) scale(0.75);
+        opacity: 0.9;
+      }
+
+      .sky.midday::before {
+        transform: translate(-10%, -55%) scale(0.95);
+        opacity: 1;
+      }
+
+      .sky.sunset::before {
+        transform: translate(20%, 5%) scale(0.8);
+        opacity: 0.75;
+      }
+
+      .sky.night::before {
+        opacity: 0;
+      }
+
+      .sky::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(
+            2px 2px at 20% 30%,
+            rgba(255, 255, 255, 0.9),
+            rgba(255, 255, 255, 0)
+          ),
+          radial-gradient(2px 2px at 70% 10%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0)),
+          radial-gradient(2px 2px at 35% 65%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0)),
+          radial-gradient(2px 2px at 80% 55%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+        background-repeat: no-repeat;
+        opacity: 0;
+        filter: brightness(1);
+        transition: opacity 800ms ease, filter 800ms ease;
+      }
+
+      .sky.sunset::after {
+        opacity: 0.35;
+        filter: brightness(1.1);
+      }
+
+      .sky.night::after {
+        opacity: 0.9;
+        filter: brightness(1.2);
       }
 
       #container {
@@ -34,6 +153,9 @@
         width: min(70vh, 80%);
         max-width: 600px;
         height: 100%;
+        color: inherit;
+        position: relative;
+        z-index: 1;
       }
 
       canvas {
@@ -50,16 +172,17 @@
         margin-top: 30px;
         font-size: 16px;
         padding-left: 20px;
-        color: #172b36;
+        color: inherit;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
       }
 
       #interactButton {
         font-family: monospace;
         margin-top: 20px;
         padding: 10px 18px;
-        border: 1px solid #172b36;
-        background: rgba(241, 246, 244, 0.8);
-        color: #172b36;
+        border: 1px solid currentColor;
+        background: rgba(241, 246, 244, 0.65);
+        color: inherit;
         border-radius: 4px;
         cursor: pointer;
         transition: background 0.2s ease, transform 0.1s ease;
@@ -76,15 +199,27 @@
         margin-top: auto;
         margin-bottom: 20px;
         font-size: 10px;
+        color: inherit;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
       }
 
       #made a {
-        color: #172b36;
+        color: inherit;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        body,
+        .sky,
+        .sky::before,
+        .sky::after {
+          transition-duration: 0ms;
+        }
       }
     </style>
   </head>
 
   <body>
+    <div class="sky" aria-hidden="true"></div>
     <div id="container">
       <canvas id="pongCanvas" width="600" height="600"></canvas>
       <div id="score"></div>
@@ -114,6 +249,35 @@
     const ctx = canvas.getContext("2d");
     const scoreElement = document.getElementById("score");
     const interactButton = document.getElementById("interactButton");
+    const sky = document.querySelector(".sky");
+
+    function getSkyPhase(date) {
+      const hours = date.getHours();
+
+      if (hours >= 5 && hours < 10) return "sunrise";
+      if (hours >= 10 && hours < 16) return "midday";
+      if (hours >= 16 && hours < 20) return "sunset";
+      return "night";
+    }
+
+    function applySkyPhase(phase) {
+      document.body.classList.add(phase);
+      sky?.classList.add(phase);
+
+      const themeColors = {
+        sunrise: "#ffb48a",
+        midday: "#92d7f5",
+        sunset: "#ff9966",
+        night: "#05070f",
+      };
+
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta && themeColors[phase]) {
+        themeMeta.setAttribute("content", themeColors[phase]);
+      }
+    }
+
+    applySkyPhase(getSkyPhase(new Date()));
 
     const DAY_COLOR = colorPalette.MysticMint;
     const DAY_BALL_COLOR = colorPalette.NocturnalExpedition;
