@@ -17,6 +17,12 @@
         height: 100%;
       }
 
+      @property --foreground-color {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #172b36;
+      }
+
       body {
         height: 100%;
         margin: 0;
@@ -24,7 +30,58 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: linear-gradient(to bottom, #172b36 0%, #d9e8e3 100%);
+        position: relative;
+        overflow: hidden;
+        color: var(--foreground-color);
+        background: #05070f;
+        animation: foregroundShift 40s linear infinite;
+      }
+
+      .sky {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(180deg, #ffb48a 0%, #ffe8a3 45%, #87c6e5 100%);
+        animation: skyCycle 40s linear infinite;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .sky::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 60vmin;
+        height: 60vmin;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 219, 137, 0.85) 0%,
+          rgba(255, 219, 137, 0.55) 35%,
+          rgba(255, 219, 137, 0) 70%
+        );
+        transform: translate(-50%, -10%) scale(0.8);
+        mix-blend-mode: screen;
+        filter: blur(2px);
+        opacity: 0.85;
+        animation: sunPath 40s linear infinite;
+      }
+
+      .sky::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(
+            2px 2px at 20% 30%,
+            rgba(255, 255, 255, 0.9),
+            rgba(255, 255, 255, 0)
+          ),
+          radial-gradient(2px 2px at 70% 10%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0)),
+          radial-gradient(2px 2px at 35% 65%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0)),
+          radial-gradient(2px 2px at 80% 55%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+        background-repeat: no-repeat;
+        opacity: 0;
+        animation: starTwinkle 40s linear infinite;
       }
 
       #container {
@@ -34,6 +91,9 @@
         width: min(70vh, 80%);
         max-width: 600px;
         height: 100%;
+        color: inherit;
+        position: relative;
+        z-index: 1;
       }
 
       canvas {
@@ -50,16 +110,17 @@
         margin-top: 30px;
         font-size: 16px;
         padding-left: 20px;
-        color: #172b36;
+        color: inherit;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
       }
 
       #interactButton {
         font-family: monospace;
         margin-top: 20px;
         padding: 10px 18px;
-        border: 1px solid #172b36;
-        background: rgba(241, 246, 244, 0.8);
-        color: #172b36;
+        border: 1px solid currentColor;
+        background: rgba(241, 246, 244, 0.65);
+        color: inherit;
         border-radius: 4px;
         cursor: pointer;
         transition: background 0.2s ease, transform 0.1s ease;
@@ -76,15 +137,103 @@
         margin-top: auto;
         margin-bottom: 20px;
         font-size: 10px;
+        color: inherit;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
       }
 
       #made a {
-        color: #172b36;
+        color: inherit;
+      }
+
+      @keyframes skyCycle {
+        0%,
+        100% {
+          background: linear-gradient(180deg, #ffb48a 0%, #ffe8a3 40%, #87c6e5 100%);
+        }
+        20% {
+          background: linear-gradient(180deg, #92d7f5 0%, #d9f2ff 35%, #f9fbff 100%);
+        }
+        45% {
+          background: linear-gradient(180deg, #ff9966 0%, #ffcc66 35%, #514a6d 100%);
+        }
+        65% {
+          background: linear-gradient(180deg, #1a2750 0%, #121a36 45%, #05070f 100%);
+        }
+        85% {
+          background: radial-gradient(circle at top, #0b1224 0%, #03050b 55%, #000 100%);
+        }
+      }
+
+      @keyframes foregroundShift {
+        0%,
+        100% {
+          --foreground-color: #172b36;
+        }
+        20% {
+          --foreground-color: #1a2f3a;
+        }
+        45% {
+          --foreground-color: #142530;
+        }
+        65%,
+        85% {
+          --foreground-color: #d9e8e3;
+        }
+      }
+
+      @keyframes sunPath {
+        0% {
+          transform: translate(-50%, 20%) scale(0.75);
+          opacity: 0.9;
+        }
+        20% {
+          transform: translate(-30%, -60%) scale(0.9);
+          opacity: 1;
+        }
+        45% {
+          transform: translate(10%, 0%) scale(0.8);
+          opacity: 0.9;
+        }
+        60% {
+          transform: translate(30%, 40%) scale(0.7);
+          opacity: 0.4;
+        }
+        70% {
+          opacity: 0;
+        }
+        100% {
+          transform: translate(-50%, 20%) scale(0.75);
+          opacity: 0;
+        }
+      }
+
+      @keyframes starTwinkle {
+        0%,
+        60% {
+          opacity: 0;
+          filter: brightness(1);
+        }
+        70% {
+          opacity: 0.6;
+        }
+        80% {
+          opacity: 0.9;
+          filter: brightness(1.2);
+        }
+        90% {
+          opacity: 0.7;
+          filter: brightness(0.9);
+        }
+        100% {
+          opacity: 0;
+          filter: brightness(1);
+        }
       }
     </style>
   </head>
 
   <body>
+    <div class="sky" aria-hidden="true"></div>
     <div id="container">
       <canvas id="pongCanvas" width="600" height="600"></canvas>
       <div id="score"></div>
