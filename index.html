@@ -53,6 +53,22 @@
         color: #172b36;
       }
 
+      #interactButton {
+        font-family: monospace;
+        margin-top: 20px;
+        padding: 10px 18px;
+        border: 1px solid #172b36;
+        background: rgba(241, 246, 244, 0.8);
+        color: #172b36;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.1s ease;
+      }
+
+      #interactButton:active {
+        transform: scale(0.98);
+      }
+
       #made {
         text-align: center;
         line-height: 1.5;
@@ -72,6 +88,7 @@
     <div id="container">
       <canvas id="pongCanvas" width="600" height="600"></canvas>
       <div id="score"></div>
+      <button id="interactButton" hidden>Interact</button>
       <p id="made">
         made by
         <a href="https://koenvangilst.nl/labs/pong-wars">Koen van Gilst</a> | source on
@@ -96,6 +113,7 @@
     const canvas = document.getElementById("pongCanvas");
     const ctx = canvas.getContext("2d");
     const scoreElement = document.getElementById("score");
+    const interactButton = document.getElementById("interactButton");
 
     const DAY_COLOR = colorPalette.MysticMint;
     const DAY_BALL_COLOR = colorPalette.NocturnalExpedition;
@@ -201,12 +219,26 @@
     }
 
     function clampSpeed(ball) {
-      ball.dx = Math.min(Math.max(ball.dx, -MAX_SPEED), MAX_SPEED);
-      ball.dy = Math.min(Math.max(ball.dy, -MAX_SPEED), MAX_SPEED);
+      const speed = Math.hypot(ball.dx, ball.dy);
 
-      // Make sure the ball always maintains a minimum speed
-      if (Math.abs(ball.dx) < MIN_SPEED) ball.dx = ball.dx > 0 ? MIN_SPEED : -MIN_SPEED;
-      if (Math.abs(ball.dy) < MIN_SPEED) ball.dy = ball.dy > 0 ? MIN_SPEED : -MIN_SPEED;
+      if (speed === 0) {
+        ball.dx = MIN_SPEED;
+        ball.dy = 0;
+        return;
+      }
+
+      if (speed > MAX_SPEED) {
+        const scale = MAX_SPEED / speed;
+        ball.dx *= scale;
+        ball.dy *= scale;
+        return;
+      }
+
+      if (speed < MIN_SPEED) {
+        const scale = MIN_SPEED / speed;
+        ball.dx *= scale;
+        ball.dy *= scale;
+      }
     }
 
     function addRandomness(ball) {
@@ -278,6 +310,10 @@
         ball.y += ball.dy;
 
         addRandomness(ball);
+
+        if (ball === balls[1]) {
+          applyOrientationInfluence(ball);
+        }
       });
 
       handleBallCollisions();
@@ -288,5 +324,109 @@
 
     const FRAME_RATE = 100;
     setInterval(draw, 1000 / FRAME_RATE);
+
+    const isMobileDevice = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
+    let motionEnabled = false;
+    let baselineOrientation = null;
+    let lastOrientation = null;
+    const tiltVector = { x: 0, y: 0 };
+    let orientationListenerAttached = false;
+
+    function calibrateBaseline() {
+      if (lastOrientation) {
+        baselineOrientation = { ...lastOrientation };
+      } else {
+        baselineOrientation = null;
+      }
+      tiltVector.x = 0;
+      tiltVector.y = 0;
+    }
+
+    function handleOrientation(event) {
+      const beta = event.beta ?? 0; // front-to-back tilt
+      const gamma = event.gamma ?? 0; // left-to-right tilt
+
+      lastOrientation = { beta, gamma };
+
+      if (!motionEnabled) return;
+
+      if (baselineOrientation === null) {
+        baselineOrientation = { beta, gamma };
+        tiltVector.x = 0;
+        tiltVector.y = 0;
+        return;
+      }
+
+      const deltaBeta = beta - baselineOrientation.beta;
+      const deltaGamma = gamma - baselineOrientation.gamma;
+
+      const MAX_TILT = 45;
+      const clamp = (value) => Math.min(Math.max(value, -MAX_TILT), MAX_TILT) / MAX_TILT;
+
+      const targetX = clamp(deltaGamma);
+      const targetY = clamp(deltaBeta);
+
+      const SMOOTHING = 0.2;
+      tiltVector.x += (targetX - tiltVector.x) * SMOOTHING;
+      tiltVector.y += (targetY - tiltVector.y) * SMOOTHING;
+    }
+
+    function applyOrientationInfluence(ball) {
+      if (!motionEnabled) return;
+
+      const steeringStrength = MAX_SPEED * 0.35;
+
+      ball.dx += tiltVector.x * steeringStrength;
+      ball.dy += tiltVector.y * steeringStrength;
+
+      clampSpeed(ball);
+    }
+
+    if (isMobileDevice) {
+      interactButton.hidden = false;
+
+      interactButton.addEventListener("click", async () => {
+        if (motionEnabled) {
+          calibrateBaseline();
+          interactButton.textContent = "Recalibrated — keep tilting";
+          setTimeout(() => {
+            if (motionEnabled) {
+              interactButton.textContent = "Motion active — tap to recalibrate";
+            }
+          }, 2000);
+          return;
+        }
+
+        try {
+          if (typeof DeviceOrientationEvent === "undefined") {
+            interactButton.textContent = "Unavailable";
+            return;
+          }
+
+          if (
+            typeof DeviceOrientationEvent.requestPermission === "function"
+          ) {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== "granted") {
+              interactButton.textContent = "Permission denied";
+              return;
+            }
+          }
+
+          if (!orientationListenerAttached) {
+            window.addEventListener("deviceorientation", handleOrientation, true);
+            orientationListenerAttached = true;
+          }
+
+          motionEnabled = true;
+          calibrateBaseline();
+          interactButton.textContent = "Motion active — tap to recalibrate";
+        } catch (error) {
+          console.error("Device orientation error", error);
+          interactButton.textContent = "Unavailable";
+        }
+      });
+    }
   </script>
 </html>
