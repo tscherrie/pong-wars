@@ -200,17 +200,68 @@
       }
     }
 
-    function addRandomness(ball) {
-      ball.dx += Math.random() * 0.02 - 0.01;
-      ball.dy += Math.random() * 0.02 - 0.01;
-
-      // Limit the speed of the ball
+    function clampSpeed(ball) {
       ball.dx = Math.min(Math.max(ball.dx, -MAX_SPEED), MAX_SPEED);
       ball.dy = Math.min(Math.max(ball.dy, -MAX_SPEED), MAX_SPEED);
 
       // Make sure the ball always maintains a minimum speed
       if (Math.abs(ball.dx) < MIN_SPEED) ball.dx = ball.dx > 0 ? MIN_SPEED : -MIN_SPEED;
       if (Math.abs(ball.dy) < MIN_SPEED) ball.dy = ball.dy > 0 ? MIN_SPEED : -MIN_SPEED;
+    }
+
+    function addRandomness(ball) {
+      ball.dx += Math.random() * 0.02 - 0.01;
+      ball.dy += Math.random() * 0.02 - 0.01;
+
+      clampSpeed(ball);
+    }
+
+    function resolveBallCollision(ballA, ballB) {
+      let dx = ballA.x - ballB.x;
+      let dy = ballA.y - ballB.y;
+      let distance = Math.hypot(dx, dy);
+      const minDistance = SQUARE_SIZE;
+
+      if (distance === 0) {
+        const angle = Math.random() * Math.PI * 2;
+        ballB.x += Math.cos(angle) * 0.1;
+        ballB.y += Math.sin(angle) * 0.1;
+        return;
+      }
+
+      if (distance >= minDistance) return;
+
+      const nx = dx / distance;
+      const ny = dy / distance;
+
+      const overlap = (minDistance - distance) / 2;
+      ballA.x += nx * overlap;
+      ballA.y += ny * overlap;
+      ballB.x -= nx * overlap;
+      ballB.y -= ny * overlap;
+
+      const relativeVelocityX = ballA.dx - ballB.dx;
+      const relativeVelocityY = ballA.dy - ballB.dy;
+      const speed = relativeVelocityX * nx + relativeVelocityY * ny;
+
+      if (speed > 0) return;
+
+      const impulse = -speed;
+      ballA.dx += impulse * nx;
+      ballA.dy += impulse * ny;
+      ballB.dx -= impulse * nx;
+      ballB.dy -= impulse * ny;
+
+      clampSpeed(ballA);
+      clampSpeed(ballB);
+    }
+
+    function handleBallCollisions() {
+      for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+          resolveBallCollision(balls[i], balls[j]);
+        }
+      }
     }
 
     function draw() {
@@ -228,6 +279,8 @@
 
         addRandomness(ball);
       });
+
+      handleBallCollisions();
 
       iteration++;
       if (iteration % 1_000 === 0) console.log("iteration", iteration);
